@@ -7,6 +7,16 @@ OKMD.app/
 dist/
 *.zip
 
+# Signing — private keys and certificates. Never commit these. Once a key is in
+# the history of a public repo, deleting it later does not remove it; the only
+# fix is revoking the certificate.
+*.p12
+*.pfx
+*.p8
+*.cer
+*.certSigningRequest
+*.provisionprofile
+
 # Scratch
 _to_delete/
 

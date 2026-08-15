@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  The only entitlement OKMD needs.
+
+	  V8 compiles JavaScript to machine code at runtime, which the hardened
+	  runtime blocks unless this is granted. Notarization requires the hardened
+	  runtime, so this is required in turn.
+
+	  Deliberately nothing else. The app is not sandboxed, so opening and saving
+	  files needs no entitlement; it has no native modules, so library
+	  validation stays on; and it makes no network requests and never touches
+	  the camera, microphone, or location.
+	-->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+</dict>
+</plist>

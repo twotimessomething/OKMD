@@ -10,14 +10,9 @@ There is one interaction: the **Preview / Raw** toggle at the top, or ⌘E.
 Download `OKMD-mac-arm64.zip` from [Releases][releases], unzip it, and drag
 `OKMD.app` into `/Applications`.
 
-The app is signed ad-hoc rather than with an Apple Developer certificate, so
-macOS quarantines it on first launch and refuses to open it. To clear that:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/OKMD.app
-```
-
-It opens normally afterwards. Apple Silicon only.
+The app is signed with an Apple Developer ID and notarized by Apple, so it
+opens on a double-click — no warning dialog and no terminal commands. Apple
+Silicon only.
 
 [releases]: ../../releases
 
@@ -59,8 +54,47 @@ makes no network requests.
 
 ## Build
 
-`./pack.sh` repacks `app/` into `OKMD.app`, applies `OKMD.icns`, re-signs, and
-refreshes `okmd-source.zip`.
+`./pack.sh` repacks `app/` into `OKMD.app`, applies `OKMD.icns`, re-signs
+ad-hoc, and refreshes `okmd-source.zip`. That is the loop for local iteration.
+
+`./pack.sh --release` does the same, then signs with the Developer ID
+certificate, notarizes with Apple, staples the ticket, and writes the
+`OKMD-mac-arm64.zip` that gets uploaded to Releases. It verifies at each step
+and stops on the first failure.
+
+### Signing a release
+
+One-time setup, needing a paid Apple Developer Program membership:
+
+1. Create the certificate: Xcode ▸ Settings ▸ Accounts ▸ your Apple ID ▸
+   Manage Certificates ▸ **+** ▸ **Developer ID Application**. The private key
+   is generated straight into the login keychain and should stay there —
+   `pack.sh` never reads or copies it, it asks macOS to sign on its behalf.
+2. Generate an app-specific password at [appleid.apple.com][asp] ▸ Sign-In and
+   Security ▸ App-Specific Passwords. This is *not* your Apple ID password, and
+   it can only submit apps for notarization — it cannot sign anything.
+3. Store it in the keychain so it never lives in a script or a shell history:
+
+   ```bash
+   xcrun notarytool store-credentials "okmd-notary" \
+     --apple-id "<your-apple-id>" --team-id "LPJ28CF2F5" --password "<app-specific-password>"
+   ```
+
+Then `./pack.sh --release` for every release. Roughly three minutes, most of it
+waiting on Apple.
+
+Two things worth knowing. Signatures carry a secure timestamp, so builds stay
+valid after the certificate expires — letting the membership lapse does not
+break anything already shipped. And if a `.p12` export of the key ever leaks,
+revoke the certificate at [developer.apple.com][certs] and re-sign; `.gitignore`
+covers the certificate extensions so one cannot be committed by accident.
+
+`build/entitlements.plist` grants exactly one entitlement, `allow-jit`, which
+V8 needs under the hardened runtime. `scripts/sign.mjs` explains why it does not
+use the `electron-osx-sign` CLI.
+
+[asp]: https://appleid.apple.com
+[certs]: https://developer.apple.com/account/resources/certificates
 
 To build the bundle from scratch:
 

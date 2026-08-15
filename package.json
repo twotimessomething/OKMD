@@ -1,0 +1,10 @@
+{
+  "name": "okmd-build",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build and signing tooling for OKMD. The app itself lives in app/.",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/osx-sign": "^2.6.0"
+  }
+}
