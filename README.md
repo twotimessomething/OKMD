@@ -62,6 +62,12 @@ certificate, notarizes with Apple, staples the ticket, and writes the
 `OKMD-mac-arm64.zip` that gets uploaded to Releases. It verifies at each step
 and stops on the first failure.
 
+`./pack.sh --publish` goes one further and uploads that zip with `gh`. The tag
+defaults to `v` plus the version in `app/package.json`; pass one explicitly as
+`./pack.sh --publish v1.1.0`. If a release for the tag already exists its asset
+is replaced, and if not a **draft** is created — so a new version never goes
+public before you have read the notes over.
+
 ### Signing a release
 
 One-time setup, needing a paid Apple Developer Program membership:
@@ -80,8 +86,11 @@ One-time setup, needing a paid Apple Developer Program membership:
      --apple-id "<your-apple-id>" --team-id "LPJ28CF2F5" --password "<app-specific-password>"
    ```
 
-Then `./pack.sh --release` for every release. Roughly three minutes, most of it
-waiting on Apple.
+Then `./pack.sh --publish` for every release. Roughly three minutes, most of it
+waiting on Apple. Two conveniences worth setting up once: authenticate `gh auth
+login` so the upload step works, and add `/usr/bin/codesign` to the signing
+key's access list in Keychain Access (Get Info ▸ Access Control) so macOS stops
+asking for your password once per binary.
 
 Two things worth knowing. Signatures carry a secure timestamp, so builds stay
 valid after the certificate expires — letting the membership lapse does not
