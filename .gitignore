@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Build output — the packed app is published as a Release asset, not committed
+# (its Electron framework binary is 183 MB, over GitHub's 100 MB file limit)
+OKMD.app/
+dist/
+*.zip
+
+# Scratch
+_to_delete/
+
+# Node
+node_modules/

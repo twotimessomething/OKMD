@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data: file:;">
+<title>OKMD</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --bg-elevated: #ffffff;
+    --text: #2f2e2b;
+    --text-heading: #191917;
+    --text-muted: #73705f;
+    --accent: #ae5630;
+    --border: #e6e3d8;
+    --border-strong: #d9d5c7;
+    --code-bg: #f2f0e8;
+    --code-block-bg: #f5f4ee;
+    --inline-code-text: #6d3f2a;
+    --seg-bg: #eceade;
+    --seg-active-bg: #ffffff;
+    --seg-shadow: 0 1px 3px rgba(60, 55, 40, 0.14);
+    --selection: rgba(174, 86, 48, 0.18);
+    --marker: #a8a291;
+    --logo-md: #f79b19; /* brand orange — constant in both themes */
+    /* syntax */
+    --hl-keyword: #a24f2d;
+    --hl-string: #567d46;
+    --hl-title: #6d5aa8;
+    --hl-number: #99691c;
+    --hl-comment: #a09a8a;
+    --hl-builtin: #2f6f6a;
+    --hl-attr: #8a6c2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #262624;
+      --bg-elevated: #2e2e2b;
+      --text: #e3e1da;
+      --text-heading: #f3f1ea;
+      --text-muted: #a09c8e;
+      --accent: #de9871;
+      --border: #3b3a36;
+      --border-strong: #4a4843;
+      --code-bg: #1e1d1b;
+      --code-block-bg: #1e1d1b;
+      --inline-code-text: #e0aa88;
+      --seg-bg: #1d1d1b;
+      --seg-active-bg: #3d3c38;
+      --seg-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      --selection: rgba(222, 152, 113, 0.24);
+      --marker: #6e6a5e;
+      --hl-keyword: #e08c65;
+      --hl-string: #a3c48b;
+      --hl-title: #b5a8e0;
+      --hl-number: #d9b06a;
+      --hl-comment: #85816f;
+      --hl-builtin: #7fbcb6;
+      --hl-attr: #d3b878;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+  }
+  ::selection { background: var(--selection); }
+
+  /* ---------- Top bar ---------- */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-app-region: drag;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+  }
+  #seg {
+    -webkit-app-region: no-drag;
+    display: flex; gap: 2px;
+    background: var(--seg-bg);
+    border-radius: 9px; padding: 2px;
+  }
+  #seg button {
+    appearance: none; border: 0; background: transparent;
+    font: 500 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-muted);
+    padding: 6px 16px; border-radius: 7px; cursor: pointer;
+    transition: color 0.12s ease;
+  }
+  #seg button.active {
+    background: var(--seg-active-bg);
+    color: var(--text-heading);
+    box-shadow: var(--seg-shadow);
+  }
+  #filename {
+    position: absolute; right: 16px;
+    font: 400 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-muted);
+    max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ---------- Panes ---------- */
+  #start-scroll, #preview-scroll, #raw-scroll {
+    position: absolute; top: 52px; bottom: 0; left: 0; right: 0;
+    overflow-y: auto;
+    display: none;
+  }
+  body[data-view="start"]   #start-scroll,
+  body[data-view="preview"] #preview-scroll,
+  body[data-view="raw"]     #raw-scroll { display: block; }
+  /* Nothing to toggle or name until a document is open. */
+  body[data-view="start"] #seg,
+  body[data-view="start"] #filename { display: none; }
+
+  /* ---------- Start screen ---------- */
+  #start {
+    max-width: 480px; margin: 0 auto;
+    padding: 48px 36px 64px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .start-title { margin: 0 0 34px; line-height: 0; }
+  .start-logo { display: block; height: 44px; width: auto; }
+  .start-logo .ok { fill: var(--text-heading); }
+  .start-logo .md { fill: var(--logo-md); }
+  .start-label-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0 0 10px;
+  }
+  .start-label {
+    font: 600 10.5px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  #clear-recents {
+    appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer;
+    font: 400 11.5px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-muted);
+  }
+  #clear-recents:hover { color: var(--text); }
+
+  #recents { list-style: none; margin: 0; padding: 0; }
+  .recent {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: baseline; gap: 14px;
+    width: calc(100% + 20px); margin: 0 -10px;
+    padding: 7px 10px; border-radius: 7px;
+    text-align: left;
+    font: 400 13.5px/1.35 -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: background-color 0.1s ease;
+  }
+  .recent:hover, .recent:focus-visible { background: var(--code-bg); outline: none; }
+  /* The name keeps its space; the location gives way first. */
+  .recent .name {
+    flex: 0 0 auto; max-width: 60%;
+    font-weight: 500; color: var(--text-heading);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .recent .dir {
+    flex: 1 1 auto; min-width: 0; text-align: right;
+    font-size: 11.5px; color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .recent-empty {
+    margin: 0; padding: 2px 0;
+    font: 400 13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-muted);
+  }
+
+  .start-actions {
+    display: flex; gap: 8px;
+    margin: 28px 0 0; padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .start-actions button {
+    appearance: none; cursor: pointer;
+    font: 500 13px -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-heading);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px; padding: 7px 15px;
+    transition: border-color 0.12s ease;
+  }
+  .start-actions button:hover { border-color: var(--text-muted); }
+  .start-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .start-hint {
+    margin: 20px 0 0;
+    font: 400 11.5px/1.6 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-muted);
+  }
+
+  /* ---------- Preview typography ---------- */
+  #preview {
+    max-width: 720px; margin: 0 auto;
+    padding: 44px 36px 96px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-size: 15.5px; line-height: 1.65;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    word-wrap: break-word;
+    outline: none;
+    caret-color: var(--accent);
+  }
+  #preview > :first-child { margin-top: 0; }
+
+  #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+    font-family: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+    color: var(--text-heading);
+    font-weight: 600; letter-spacing: -0.01em;
+    line-height: 1.25;
+    margin: 1.7em 0 0.55em;
+  }
+  #preview h1 { font-size: 1.85em; letter-spacing: -0.02em; margin-top: 0.9em; }
+  #preview h2 { font-size: 1.4em; }
+  #preview h3 { font-size: 1.15em; }
+  #preview h4 { font-size: 1em; }
+  #preview h5, #preview h6 { font-size: 0.9em; color: var(--text-muted); }
+
+  #preview p { margin: 0.9em 0; }
+
+  #preview a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  #preview a:hover { text-decoration-color: var(--accent); }
+
+  #preview strong { font-weight: 700; color: var(--text-heading); }
+
+  #preview ul, #preview ol { margin: 0.7em 0; padding-left: 1.5em; }
+  #preview li { margin: 0.32em 0; }
+  #preview li::marker { color: var(--marker); }
+  #preview li > ul, #preview li > ol { margin: 0.25em 0; }
+  #preview input[type="checkbox"] {
+    accent-color: var(--accent);
+    margin-right: 0.45em;
+    transform: translateY(1px);
+  }
+
+  #preview blockquote {
+    margin: 1.1em 0; padding: 0.1em 0 0.1em 1.1em;
+    border-left: 3px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  #preview blockquote > :first-child { margin-top: 0; }
+  #preview blockquote > :last-child { margin-bottom: 0; }
+
+  #preview code {
+    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.84em;
+  }
+  #preview :not(pre) > code {
+    background: var(--code-bg);
+    color: var(--inline-code-text);
+    padding: 0.15em 0.42em;
+    border-radius: 5px;
+  }
+  #preview pre {
+    background: var(--code-block-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 17px;
+    overflow-x: auto;
+    margin: 1.1em 0;
+    line-height: 1.55;
+  }
+  #preview pre code { background: transparent; padding: 0; color: var(--text); font-size: 0.82em; }
+
+  #preview hr {
+    border: 0; height: 1px;
+    background: var(--border);
+    margin: 2.2em 0;
+  }
+
+  #preview table {
+    border-collapse: collapse;
+    margin: 1.2em 0;
+    width: 100%;
+    font-size: 0.93em;
+  }
+  #preview th {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 600; text-align: left;
+    color: var(--text-heading);
+    border-bottom: 2px solid var(--border-strong);
+    padding: 7px 12px;
+  }
+  #preview td { border-bottom: 1px solid var(--border); padding: 7px 12px; }
+  #preview tr:last-child td { border-bottom: 1px solid var(--border-strong); }
+
+  #preview img { max-width: 100%; border-radius: 8px; }
+
+  /* ---------- Syntax highlighting ---------- */
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag, .hljs-meta { color: var(--hl-keyword); }
+  .hljs-string, .hljs-regexp, .hljs-addition { color: var(--hl-string); }
+  .hljs-title, .hljs-title.function_, .hljs-title.class_, .hljs-section, .hljs-name { color: var(--hl-title); }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link { color: var(--hl-number); }
+  .hljs-comment, .hljs-quote, .hljs-deletion { color: var(--hl-comment); font-style: italic; }
+  .hljs-built_in, .hljs-builtin-name, .hljs-type, .hljs-class { color: var(--hl-builtin); }
+  .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id, .hljs-params { color: var(--hl-attr); }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: 700; }
+
+  /* ---------- Raw editor ---------- */
+  #raw {
+    display: block;
+    width: 100%; max-width: 860px; margin: 0 auto;
+    min-height: calc(100% - 1px);
+    padding: 40px 36px 96px;
+    border: 0; outline: none; resize: none;
+    background: transparent;
+    color: var(--text);
+    caret-color: var(--accent);
+    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13.5px; line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Drop hint ---------- */
+  #drop-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: none; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    backdrop-filter: blur(3px);
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    font: 500 15px -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  body.dragging #drop-overlay { display: flex; }
+</style>
+</head>
+<body data-view="start">
+  <div id="topbar">
+    <div id="seg">
+      <button id="btn-preview" class="active">Preview</button>
+      <button id="btn-raw">Raw</button>
+    </div>
+    <div id="filename"></div>
+  </div>
+
+  <div id="start-scroll">
+    <div id="start">
+      <h1 class="start-title">
+        <svg class="start-logo" viewBox="159 192 682 616" role="img" aria-label="OKMD">
+          <path class="ok" d="M182.28,348.19c0-93.42,71.13-156.01,156.96-156.01s151.74,59.27,151.74,149.85-71.13,156.96-156.96,156.96-151.74-59.27-151.74-150.79ZM346.83,480.02c39.83,0,82.04-30.82,82.04-116.18,0-89.62-46.47-152.69-102.43-152.69-39.83,0-82.04,30.82-82.04,115.23,0,90.57,46.47,153.64,102.43,153.64Z"/>
+          <path class="ok" d="M548.37,453.94v-214.34c0-17.55-10.91-23.71-31.3-26.56v-13.28h119.02v13.28c-20.86,2.85-31.3,9.01-31.3,26.56v123.29l116.65-119.97c17.55-17.55,2.37-27.98-15.17-29.87v-13.28h100.53v13.28c-18.49,1.9-43.15,10.91-63.54,31.77l-60.22,61.65c-11.85,12.33-9.96,21.81.95,35.56l72.55,95.79c25.13,33.67,42.68,39.83,61.17,43.15v13.28h-128.03v-13.28c16.12-2.37,26.55-10.43,12.33-29.4l-53.58-70.66c-6.16-8.06-10.43-13.75-18.49-13.75-12.33,0-25.13,13.28-25.13,48.84v37.94c0,18.02,10.43,24.18,31.3,27.03v13.28h-119.02v-13.28c20.39-2.85,31.3-9.01,31.3-27.03Z"/>
+          <path class="md" d="M192.25,767.51v-214.34c0-17.55-12.33-23.71-32.72-26.56v-13.28h88.67l97.21,202.48,91.99-202.48h87.73v13.28c-20.39,2.85-30.82,9.01-30.82,26.56v214.34c0,18.02,10.43,24.18,30.82,27.03v13.28h-118.55v-13.28c20.39-2.84,30.82-9.01,30.82-27.03v-205.8l-100.53,220.03h-17.07l-106.7-221.45v207.22c0,18.02,12.33,24.18,32.72,27.03v13.28h-86.3v-13.28c20.39-2.84,32.72-9.01,32.72-27.03Z"/>
+          <path class="md" d="M584.88,767.51v-214.34c0-17.55-10.91-23.71-31.3-26.56v-13.28h123.29c93.42,0,163.6,38.41,163.6,144.63,0,116.65-87.73,148.9-155.06,148.9-18.97,0-53.11-2.84-76.35-2.84-17.55,0-35.09,1.42-55.48,3.79v-13.28c20.39-2.84,31.3-9.01,31.3-27.03ZM678.3,790.27c73.5,0,101.48-59.75,101.48-132.3,0-76.82-32.25-128.03-101-128.03h-8.06c-19.92,0-29.4,5.69-29.4,23.71v213.86c0,19.44,19.92,22.76,36.99,22.76Z"/>
+        </svg>
+      </h1>
+
+      <div class="start-label-row">
+        <h2 class="start-label">Recently opened</h2>
+        <button id="clear-recents" hidden>Clear</button>
+      </div>
+      <ul id="recents"></ul>
+      <p class="recent-empty" id="recents-empty">Nothing yet.</p>
+
+      <div class="start-actions">
+        <button id="start-new">New file</button>
+        <button id="start-open">Open…</button>
+      </div>
+
+      <p class="start-hint">⌘N new file · ⌘O open · ⌘⇧N new window · or drop a file here</p>
+    </div>
+  </div>
+
+  <div id="preview-scroll"><article id="preview" contenteditable="true" spellcheck="false"></article></div>
+  <div id="raw-scroll"><textarea id="raw" spellcheck="false" placeholder="# Start writing…"></textarea></div>
+  <div id="drop-overlay">Drop a markdown file to open it</div>
+
+  <script src="vendor/marked.js"></script>
+  <script src="vendor/highlight.js"></script>
+  <script src="vendor/turndown.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

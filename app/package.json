@@ -1,0 +1,9 @@
+{
+  "name": "okmd",
+  "productName": "OKMD",
+  "version": "1.0.0",
+  "description": "A minimal markdown viewer/editor with a beautiful preview.",
+  "main": "main.js",
+  "author": "Scott Shumaker",
+  "license": "MIT"
+}
