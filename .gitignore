@@ -22,3 +22,6 @@ _to_delete/
 
 # Node
 node_modules/
+
+# GUIDE record — local index, never committed
+guide.json
