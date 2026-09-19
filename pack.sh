@@ -33,6 +33,14 @@ npx --yes @electron/asar pack app OKMD.app/Contents/Resources/app.asar
 # Regenerate OKMD.icns from the logo with `python3 make-icon.py`.
 [ -f OKMD.icns ] && cp OKMD.icns OKMD.app/Contents/Resources/electron.icns
 
+# app/package.json is the one place the version lives; carry it into the bundle
+# so About and Finder agree with the release tag. Before signing, not after:
+# editing Info.plist would otherwise invalidate the signature.
+VERSION="$(node -p "require('./app/package.json').version")"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+                        -c "Set :CFBundleVersion $VERSION" \
+                        OKMD.app/Contents/Info.plist
+
 if [ "$RELEASE" -eq 0 ]; then
   codesign --force --deep --sign - OKMD.app
   touch OKMD.app   # nudge Finder/Dock to pick up a changed icon
@@ -71,7 +79,6 @@ else
       || { echo "error: gh is not installed. brew install gh" >&2; exit 1; }
     gh auth status >/dev/null 2>&1 \
       || { echo "error: gh is not authenticated. Run: gh auth login" >&2; exit 1; }
-    VERSION="$(node -p "require('./app/package.json').version")"
     TAG="${TAG:-v$VERSION}"
     if [ -n "$(git status --porcelain)" ]; then
       echo "warning: working tree is dirty, so the published build will not" >&2
