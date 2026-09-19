@@ -282,6 +282,11 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+E',
           click: onFocused(w => w && w.webContents.send('toggle-mode'))
         },
+        {
+          label: 'Toggle Outline',
+          accelerator: 'Alt+CmdOrCtrl+S',
+          click: onFocused(w => w && w.webContents.send('toggle-sidebar'))
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },

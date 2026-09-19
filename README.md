@@ -3,7 +3,8 @@
 A small, standalone markdown reader and editor for macOS, built to make reading
 markdown look good by default.
 
-There is one interaction: the **Preview / Raw** toggle at the top, or ⌘E.
+There are two interactions: the **Preview / Raw** toggle at the top, or ⌘E,
+and the outline of the document's headings on the left, or ⌥⌘S.
 
 ## Install
 
@@ -26,7 +27,10 @@ Silicon only.
 | ⌘S | Save |
 | ⌘⇧S | Save as |
 | ⌘E | Toggle Preview / Raw |
+| ⌥⌘S | Show / hide the outline |
 
+- The outline lists the document's headings. Click one to jump to that
+  section; it keeps up with you as you scroll, and works in both views.
 - The preview is editable. Type into it directly and the changes sync back to
   the markdown; task-list checkboxes are clickable and update the source.
 - Every document gets its own window. macOS native tabs work — Window ▸ Merge

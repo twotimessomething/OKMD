@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('okmd', {
   onFileOpened: (cb) => ipcRenderer.on('file-opened', (_e, data) => cb(data)),
   onFileNew: (cb) => ipcRenderer.on('file-new', () => cb()),
   onToggleMode: (cb) => ipcRenderer.on('toggle-mode', () => cb()),
+  onToggleSidebar: (cb) => ipcRenderer.on('toggle-sidebar', () => cb()),
   onRequestSave: (cb) => ipcRenderer.on('request-save', (_e, data) => cb(data)),
   onRequestSaveThenClose: (cb) => ipcRenderer.on('request-save-then-close', () => cb())
 });

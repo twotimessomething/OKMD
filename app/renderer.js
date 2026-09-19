@@ -24,6 +24,9 @@
   const recentsEl = document.getElementById('recents');
   const recentsEmptyEl = document.getElementById('recents-empty');
   const clearRecentsBtn = document.getElementById('clear-recents');
+  const sidebarBtn = document.getElementById('btn-sidebar');
+  const outlineEl = document.getElementById('outline');
+  const outlineEmptyEl = document.getElementById('outline-empty');
 
   document.execCommand('defaultParagraphSeparator', false, 'p');
 
@@ -93,13 +96,175 @@
     previewEdited = true;
     setDirty(true);
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(syncFromPreview, 400);
+    syncTimer = setTimeout(() => { syncFromPreview(); buildOutline(); }, 400);
   }
 
   function scheduleRender() {
     clearTimeout(renderTimer);
-    renderTimer = setTimeout(render, 120);
+    renderTimer = setTimeout(() => { render(); buildOutline(); }, 120);
   }
+
+  // ---- outline ----
+  // Each view answers for its own sections: the preview knows where its heading
+  // elements sit, the editor knows which source line each one is on. Neither has
+  // to guess at the other's positions.
+  const SIDEBAR_KEY = 'okmd.sidebar';
+  let outline = [];
+  let activeSection = -1;
+  // A section you jumped to keeps its highlight until you scroll for yourself:
+  // the last sections of a document can never reach the top edge, so the spy
+  // below would otherwise hand the highlight straight back to an earlier one.
+  let pinned = -1;
+  let sidebarOpen = store(SIDEBAR_KEY) !== '0';
+
+  function store(key, value) {
+    try {
+      if (value === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, value);
+    } catch (_) { /* preference just doesn't persist */ }
+    return null;
+  }
+
+  function setSidebar(open) {
+    sidebarOpen = open;
+    document.body.dataset.sidebar = open ? 'open' : 'closed';
+    sidebarBtn.setAttribute('aria-expanded', String(open));
+    store(SIDEBAR_KEY, open ? '1' : '0');
+    // Opening onto a long document should land on where the reader already is.
+    if (open && outlineEl.children[activeSection]) {
+      outlineEl.children[activeSection].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  // Headings as rendered — exactly the sections the reader can see. Only
+  // top-level ones: a heading nested in a quote or a list isn't a section.
+  function outlineFromPreview() {
+    return Array.from(preview.children)
+      .filter(el => /^H[1-6]$/.test(el.tagName))
+      .map(el => ({ level: +el.tagName[1], text: el.textContent.trim(), el }));
+  }
+
+  // Headings from the markdown source. Fenced blocks are skipped so a
+  // "# comment" inside one never reads as a section.
+  function outlineFromSource(text) {
+    const lines = text.split('\n');
+    const items = [];
+    let fence = '';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const f = line.match(/^ {0,3}(```|~~~)/);
+      if (f) {
+        if (!fence) fence = f[1];
+        else if (f[1] === fence) fence = '';
+        continue;
+      }
+      if (fence) continue;
+
+      const atx = line.match(/^ {0,3}(#{1,6})\s+(.*?)\s*#*$/);
+      if (atx) { items.push({ level: atx[1].length, text: atx[2].trim(), line: i }); continue; }
+
+      // Setext: a title with a run of = or - beneath it.
+      const above = i > 0 ? lines[i - 1] : '';
+      if (/^ {0,3}(=+|-+)\s*$/.test(line) && above.trim() && !/^ {0,3}([#>]|[-*+] )/.test(above)) {
+        items.push({ level: line.trim()[0] === '=' ? 1 : 2, text: above.trim(), line: i - 1 });
+      }
+    }
+    return items;
+  }
+
+  function buildOutline() {
+    outline = (view === 'raw' ? outlineFromSource(raw.value) : outlineFromPreview())
+      .filter(item => item.text);
+
+    outlineEl.replaceChildren(...outline.map((item, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'toc';
+      btn.dataset.lvl = item.level;
+      btn.style.setProperty('--lvl', item.level);
+      btn.textContent = item.text;
+      btn.title = item.text;
+      btn.addEventListener('click', () => goToSection(i));
+      return btn;
+    }));
+    outlineEmptyEl.hidden = outline.length > 0;
+
+    activeSection = -1;
+    pinned = -1;
+    if (view === 'preview') syncActiveSection();
+  }
+
+  function setActiveSection(i) {
+    if (i === activeSection) return;
+    const items = outlineEl.children;
+    if (items[activeSection]) items[activeSection].classList.remove('active');
+    activeSection = i;
+    if (!items[i]) return;
+    items[i].classList.add('active');
+    if (sidebarOpen) items[i].scrollIntoView({ block: 'nearest' });
+  }
+
+  // The section you are reading is the last one to have passed the top edge —
+  // or the first, while you are still above it.
+  function syncActiveSection() {
+    if (pinned >= 0) return;
+    const top = previewScroll.scrollTop + 28;
+    let i = outline.length ? 0 : -1;
+    while (i + 1 < outline.length && outline[i + 1].el.offsetTop <= top) i++;
+    setActiveSection(i);
+  }
+
+  // A textarea won't say where a line of its text sits, so measure it: lay the
+  // text up to that point out again in a hidden copy of the editor and ask the
+  // marker at the end of it. Soft wrapping is reproduced along with everything
+  // else, so the answer holds for wrapped lines too.
+  const MIRRORED = ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+                    'whiteSpace', 'overflowWrap', 'wordBreak', 'tabSize', 'textIndent',
+                    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'];
+
+  function rawLineTop(offset) {
+    const style = getComputedStyle(raw);
+    const mirror = document.createElement('div');
+    MIRRORED.forEach(prop => { mirror.style[prop] = style[prop]; });
+    // clientWidth, not the computed width: it is the padding box whatever the
+    // box-sizing, and it already excludes any scrollbar.
+    mirror.style.cssText += ';position:absolute;left:-99999px;top:0;visibility:hidden;' +
+                            'box-sizing:border-box;height:auto;width:' + raw.clientWidth + 'px;';
+    const marker = document.createElement('span');
+    mirror.append(raw.value.slice(0, offset), marker);
+    document.body.appendChild(mirror);
+    const top = marker.offsetTop;
+    mirror.remove();
+    return top;
+  }
+
+  function goToSection(i) {
+    const item = outline[i];
+    if (!item) return;
+    setActiveSection(i);
+    if (item.el) {
+      pinned = i;
+      previewScroll.scrollTo({ top: Math.max(0, item.el.offsetTop - 20), behavior: 'smooth' });
+      return;
+    }
+    const offset = raw.value.split('\n', item.line).reduce((n, l) => n + l.length + 1, 0);
+    raw.focus({ preventScroll: true });
+    raw.setSelectionRange(offset, offset);
+    raw.scrollTop = Math.max(0, rawLineTop(offset) - 20);
+  }
+
+  const unpin = () => { pinned = -1; };
+  previewScroll.addEventListener('wheel', unpin, { passive: true });
+  previewScroll.addEventListener('mousedown', unpin);
+  window.addEventListener('keydown', unpin);
+
+  let spying = false;
+  previewScroll.addEventListener('scroll', () => {
+    if (spying || view !== 'preview') return;
+    spying = true;
+    requestAnimationFrame(() => { spying = false; syncActiveSection(); });
+  });
+
+  sidebarBtn.addEventListener('click', () => setSidebar(!sidebarOpen));
 
   // ---- views ----
   function setView(next) {
@@ -112,6 +277,7 @@
     btnPreview.classList.toggle('active', next === 'preview');
     btnRaw.classList.toggle('active', next === 'raw');
     if (next === 'raw') raw.focus({ preventScroll: true });
+    buildOutline();
   }
 
   function toggleMode() {
@@ -307,6 +473,7 @@
   });
 
   window.okmd.onToggleMode(() => toggleMode());
+  window.okmd.onToggleSidebar(() => setSidebar(!sidebarOpen));
 
   window.okmd.onRequestSave(async ({ saveAs }) => {
     if (view === 'start') return;
@@ -346,5 +513,7 @@
     if (files && files.length) window.okmd.openDropped(files);
   });
 
+  setSidebar(sidebarOpen);
+  buildOutline();
   updateFilename();
 })();
